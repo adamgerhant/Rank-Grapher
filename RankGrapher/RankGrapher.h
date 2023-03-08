@@ -48,12 +48,13 @@ class RankGrapher: public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::
 	void gameEnd(string eventName);
 	void RenderCanvas(CanvasWrapper canvas);
 	void loadMenu(string eventName);
-	void CloseWindow(string eventName);
+	void scoreboardClose(string eventName);
 	void testing();
 	void loadGraph();
 	void scoreboardLoad(string eventName);
 	void RenderImGui();
 
+    bool startWindow = false;
 	bool shouldHideCursor = false;
 	bool shouldRenderImGui = false;
 	bool isGameEnd = 0;
@@ -63,8 +64,8 @@ class RankGrapher: public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::
 	int currentSession = 0;
 	int gameSessionId;
 	int playlistNum = 1;
-	int xOffset;
-	int yOffset;
+	float xOffset;
+    float yOffset;
     Vector2 screenSize;
 	string currentMatchGuid;
 	string fileName;

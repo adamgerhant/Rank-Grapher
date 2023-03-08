@@ -12,21 +12,25 @@ std::shared_ptr<CVarManagerWrapper> _globalCvarManager;
 void RankGrapher::onLoad()
 {
 	_globalCvarManager = cvarManager;
+    /*
+    isWindowOpen_ = false;
+    shouldRenderImGui = false;
 
-    isWindowOpen_ = true;
+gameWrapper->RegisterDrawable([this](CanvasWrapper canvas) {
+        RenderCanvas(canvas);
+      });
+     */ 
+    gameWrapper->SetTimeout([this](GameWrapper* gameWrapper) {
+        cvarManager->executeCommand("openmenu " + GetMenuName());
+    }, 1);
+    
+   
+     
+    
+   
+
     xOffset = -170 * ((float)screenSize.X / 1920);
     yOffset = 90 * ((float)screenSize.Y / 1080);
-    gameWrapper->RegisterDrawable([this](CanvasWrapper canvas) {
-        RenderCanvas(canvas);
-        });
-
-
-    shouldHideCursor = false;
-    shouldRenderImGui = true;
-
-	gameWrapper->SetTimeout([this](GameWrapper* gameWrapper) {
-		cvarManager->executeCommand("openmenu " + GetMenuName());
-	}, 1);
 	gameWrapper->HookEvent("Function GameEvent_Soccar_TA.WaitingForPlayers.EndState", [this](std::string eventName) {
 		onGameEntry();
 	});
@@ -45,13 +49,17 @@ void RankGrapher::onLoad()
 	cvarManager->registerCvar("displayAfterGame", "1", "displays after game", true);
 	cvarManager->registerCvar("enableSmoothness", "0", "enables custom smoothness", true);
 	cvarManager->registerCvar("smoothness", "1", "smoothness of curve", true);
+    cvarManager->registerCvar("scoreboardSettingsX", "0", "x offset of graph under scoreboard", true);
+    cvarManager->registerCvar("scoreboardSettingsY", "0", "y offset of graph under scoreboard", true);
+    cvarManager->registerCvar("gameEndSettingsX", "0", "x offset of graph after game", true);
+    cvarManager->registerCvar("gameEndSettingsY", "0", "y offset of graph after game", true);
 
     CVarWrapper displayOnScoreboardCVar = cvarManager->getCvar("displayOnScoreboard");
     if (displayOnScoreboardCVar) {
         bool displayOnScoreboard = displayOnScoreboardCVar.getBoolValue();
         if (displayOnScoreboard) {
             gameWrapper->HookEvent("Function TAGame.GFxData_GameEvent_TA.OnOpenScoreboard", bind(&RankGrapher::scoreboardLoad, this, std::placeholders::_1));
-            gameWrapper->HookEvent("Function TAGame.GFxData_GameEvent_TA.OnCloseScoreboard", bind(&RankGrapher::CloseWindow, this, std::placeholders::_1));
+            gameWrapper->HookEvent("Function TAGame.GFxData_GameEvent_TA.OnCloseScoreboard", bind(&RankGrapher::scoreboardClose, this, std::placeholders::_1));
         }
 
     }
@@ -156,14 +164,14 @@ void RankGrapher::RenderCanvas(CanvasWrapper canvas) {
 	*/
 
     screenSize = gameWrapper->GetScreenSize();
-	if (rankgrapherbg->IsLoadedForCanvas()) {
-		
-		canvas.SetPosition(Vector2F{ 475.0f  /*((float)screenSize.X / 1920)*/ + xOffset,  549.0f  /*((float)screenSize.X / 1920)*/ + yOffset});
+    if (rankgrapherbg->IsLoadedForCanvas()) {
+		canvas.SetPosition(Vector2F{ 475.0f  * (((float)screenSize.X-850) / (1920 - 850)) + xOffset,  549.0f*(((float)screenSize.Y-250 )/( 1080-250)) + yOffset});
 		canvas.DrawTexture(rankgrapherbg.get(), 1);
 	}
 	
     
     //LOG("{}", screenSize.Y);
+    
 	float yBottom = 809*((float)screenSize.Y / 1080) + yOffset;
 	float yTop = 693 * ((float)screenSize.Y / 1080) + yOffset;
 	float xLeft = 834 * ((float)screenSize.X / 1920) + xOffset;
@@ -447,7 +455,8 @@ void RankGrapher::RenderCanvas(CanvasWrapper canvas) {
 
 void RankGrapher::onGameEntry() {
 
-
+    
+    shouldHideCursor = true;
 	if (gameWrapper->IsInOnlineGame()) {
 		MMRWrapper mw = gameWrapper->GetMMRWrapper();
 		playlistNum = mw.GetCurrentPlaylist();
@@ -576,9 +585,14 @@ void RankGrapher::onGameEntry() {
 
 void RankGrapher::gameEnd(std::string eventName) {
 	
-	isWindowOpen_ = true;
-	xOffset = 0;
-	yOffset = 0;
+    CVarWrapper xCVar = cvarManager->getCvar("gameEndSettingsX");
+    if (!xCVar) { return; }
+    xOffset = xCVar.getIntValue();
+
+    CVarWrapper yCVar = cvarManager->getCvar("gameEndSettingsY");
+    if (!yCVar) { return; }
+    yOffset = yCVar.getIntValue();
+
 
 
 	isGameEnd = 1;
@@ -588,43 +602,68 @@ void RankGrapher::gameEnd(std::string eventName) {
 		RenderCanvas(canvas);
 	});
 
-
+    gameWrapper->SetTimeout([this](GameWrapper* gameWrapper) {
+        cvarManager->executeCommand("openmenu " + GetMenuName());
+      }, 1);
 
 	shouldHideCursor = false;
 	shouldRenderImGui = true;
-	
+    
+    isWindowOpen_ = true;
+    
 }
 
 void RankGrapher::scoreboardLoad(std::string eventName) {
 
 	isWindowOpen_ = true;
-	xOffset = -170 * ((float)screenSize.X / 1920);
-	yOffset = 90 * ((float)screenSize.Y / 1080) ;
+    shouldHideCursor = true;
+    shouldRenderImGui = true;
+   
+    CVarWrapper scoreboardXCVar = cvarManager->getCvar("scoreboardSettingsX");
+    if (!scoreboardXCVar) { return; }
+    int scoreboardXOffset = scoreboardXCVar.getIntValue();
+
+    CVarWrapper scoreboardYCVar = cvarManager->getCvar("scoreboardSettingsY");
+    if (!scoreboardYCVar) { return; }
+    int scoreboardYOffset = scoreboardYCVar.getIntValue();
+    
+	xOffset = (- 170 + scoreboardXOffset)* ((float)screenSize.X / 1920);
+	yOffset = (scoreboardYOffset+90) * ((float)screenSize.Y / 1080) ;
 	gameWrapper->RegisterDrawable([this](CanvasWrapper canvas) {
 		RenderCanvas(canvas);
 	});
-	
-	
-	 shouldHideCursor = false;
-	shouldRenderImGui = true;
+    gameWrapper->SetTimeout([this](GameWrapper* gameWrapper) {
+        cvarManager->executeCommand("openmenu " + GetMenuName());
+        }, 1);
+    
 
+}
+void RankGrapher::scoreboardClose(string eventName) {
+    gameWrapper->UnregisterDrawables();
+    shouldHideCursor = true;
+    shouldRenderImGui = false;
+    isWindowOpen_ = false;
+    //isWindowOpen_ = false;
 }
 void RankGrapher::loadGraph() {
 
 	gameWrapper->RegisterDrawable([this](CanvasWrapper canvas) {
 		RenderCanvas(canvas);
 		});
-	
+    gameWrapper->SetTimeout([this](GameWrapper* gameWrapper) {
+        cvarManager->executeCommand("openmenu " + GetMenuName());
+        }, 1);
+    isWindowOpen_ = true;
+    shouldRenderImGui = true;
+    
+    
 }
 void RankGrapher::loadMenu(string eventName) {
     gameWrapper->UnregisterDrawables();
     shouldRenderImGui = false;
 	shouldHideCursor = false;
+    isWindowOpen_ = false;
+    
 }
 
-void RankGrapher::CloseWindow(string eventName) {
-    gameWrapper->UnregisterDrawables();
-    shouldHideCursor = true;
-	shouldRenderImGui = false;
-	//isWindowOpen_ = false;
-}
+
