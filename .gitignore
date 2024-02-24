@@ -1,0 +1,5 @@
+.vscode
+.vs
+RankGrapher/build
+RankGrapher/plugins
+RankGrapher/*.vcxproj*

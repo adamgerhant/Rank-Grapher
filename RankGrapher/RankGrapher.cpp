@@ -250,11 +250,17 @@ void RankGrapher::RenderCanvas(CanvasWrapper canvas) {
 		}
 	}
 
-   
-    if (gameWrapper->IsInOnlineGame()) {
-        MMRWrapper mw = gameWrapper->GetMMRWrapper();
-        int userPlaylist = mw.GetCurrentPlaylist();
+    if (!gameWrapper->IsInOnlineGame()) {
+		return;
     }
+
+	ServerWrapper server = gameWrapper->GetOnlineGame();
+	if (!server) { return; }
+	GameSettingPlaylistWrapper currentPlaylist = server.GetPlaylist();
+
+	MMRWrapper mw = gameWrapper->GetMMRWrapper();
+	playlistNum = mw.GetCurrentPlaylist();
+	
 	UniqueIDWrapper uniqueID = gameWrapper->GetUniqueID();
 
     //LOG("{}", userPlaylist2);
@@ -262,17 +268,15 @@ void RankGrapher::RenderCanvas(CanvasWrapper canvas) {
 	
 
 	if (isGameEnd) {
+		if (currentPlaylist.IsLanMatch() || currentPlaylist.IsPrivateMatch()) {
+			return;
+		}
+
 		for (int i = 0; i < 10; i++) {
 		
-			if (gameWrapper->GetMMRWrapper().IsSynced(uniqueID, userPlaylist) && !gameWrapper->GetMMRWrapper().IsSyncing(uniqueID)) {
-
-				// Makes sure it is one of the ranked gamemodes to prevent crashes
-				if (!(find(begin(rankedPlaylists), end(rankedPlaylists), userPlaylist) != end(rankedPlaylists))) {
-					return;
-				}
-
+			if (gameWrapper->GetMMRWrapper().IsSynced(uniqueID, playlistNum) && !gameWrapper->GetMMRWrapper().IsSyncing(uniqueID)) {
 				// Getting the mmr
-				gameEndMMR = gameWrapper->GetMMRWrapper().GetPlayerMMR(uniqueID, userPlaylist);
+				gameEndMMR = gameWrapper->GetMMRWrapper().GetPlayerMMR(uniqueID, playlistNum);
 				if (abs(gameEndMMR - mmr) < 50) {
 					gotNewMMR = true;
 					i = 10;
@@ -457,35 +461,24 @@ void RankGrapher::onGameEntry() {
 
     
     shouldHideCursor = true;
-	if (gameWrapper->IsInOnlineGame()) {
-		MMRWrapper mw = gameWrapper->GetMMRWrapper();
-		playlistNum = mw.GetCurrentPlaylist();
 
-	}
+	ServerWrapper server = gameWrapper->GetOnlineGame();
+	if (!server) { return; }
+	GameSettingPlaylistWrapper currentPlaylist = server.GetPlaylist();
 
 	MMRWrapper mw = gameWrapper->GetMMRWrapper();
+	playlistNum = mw.GetCurrentPlaylist();
 
 	uniqueID = gameWrapper->GetUniqueID();
 
-	userPlaylist = mw.GetCurrentPlaylist();
-
-
-
-
-	if (userPlaylist != 0) {
+	if (gameWrapper->IsInOnlineGame() && !currentPlaylist.IsLanMatch() && !currentPlaylist.IsPrivateMatch()) {
 
 		gotNewMMR = false;
 		while (!gotNewMMR) {
 
-			if (gameWrapper->GetMMRWrapper().IsSynced(uniqueID, userPlaylist) && !gameWrapper->GetMMRWrapper().IsSyncing(uniqueID)) {
-
-				// Makes sure it is one of the ranked gamemodes to prevent crashes
-				if (!(find(begin(rankedPlaylists), end(rankedPlaylists), userPlaylist) != end(rankedPlaylists))) {
-					return;
-				}
-
+			if (gameWrapper->GetMMRWrapper().IsSynced(uniqueID, playlistNum) && !gameWrapper->GetMMRWrapper().IsSyncing(uniqueID)) {
 				// Getting the mmr
-				userMMR = gameWrapper->GetMMRWrapper().GetPlayerMMR(uniqueID, userPlaylist);
+				userMMR = gameWrapper->GetMMRWrapper().GetPlayerMMR(uniqueID, playlistNum);
 				gotNewMMR = true;
 			}
 		}
@@ -497,8 +490,8 @@ void RankGrapher::onGameEntry() {
 
 
 
-		fileName = to_string(userPlaylist) + "data.csv";
-		fileNameTemp = to_string(userPlaylist) + "data_temp.csv";
+		fileName = to_string(playlistNum) + "data.csv";
+		fileNameTemp = to_string(playlistNum) + "data_temp.csv";
 
 
 

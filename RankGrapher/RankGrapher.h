@@ -27,22 +27,12 @@ class RankGrapher: public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::
 	virtual void onLoad();
 	virtual void onUnload();
 	UniqueIDWrapper uniqueID;
-	int userPlaylist, yPos;
+	int yPos;
 
 	std::shared_ptr<ImageWrapper> rankgrapherbg;
 	std::shared_ptr<ImageWrapper> closeImg;
 
 	ImVec4 color = ImVec4(1.0f, 0.65f, 0.0f, 1.0f);
-
-	int rankedPlaylists[8] = { 10, // Ones
-							11, // Twos
-							13, // Threes
-							27, // Hoops
-							28, // Rumble
-							29, // Dropshot
-							30, // Snowday
-							34 // Psynoix Tournaments
-	};
 
 	void onGameEntry();
 	void gameEnd(string eventName);
