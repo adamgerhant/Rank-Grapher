@@ -48,12 +48,23 @@ class RankGrapher: public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::
 	bool shouldHideCursor = false;
 	bool shouldRenderImGui = false;
 	bool isGameEnd = 0;
-	float gameEndMMR;
-	bool gotNewMMR;
+	float gameEndMMR = 0.0;
+	bool gotNewMMR = false;
 	float userMMR = 0;
 	int currentSession = 0;
 	int gameSessionId;
-	int playlistNum = 1;
+	int playlistNum = -1;
+	bool isRanked = 0;
+
+	int goals = -1;
+	int assists = -1;
+	int saves = -1;
+	int demos = -1;
+	int shots = -1;
+	int score = -1;
+	long mvp = 0;
+	bool win = false;
+
 	float xOffset;
     float yOffset;
     Vector2 screenSize;
