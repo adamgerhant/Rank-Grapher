@@ -1,3 +1,6 @@
+#include <ctime>
+#include <filesystem>
+
 #include "pch.h"
 #include "RankGrapher.h"
 
@@ -37,7 +40,7 @@ gameWrapper->RegisterDrawable([this](CanvasWrapper canvas) {
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.Destroyed", bind(&RankGrapher::loadMenu, this, std::placeholders::_1));
     
 
-
+	bool create_directory = std::filesystem::create_directory(gameWrapper->GetDataFolder() / "RankGrapher");
 
 	rankgrapherbg = std::make_shared<ImageWrapper>(gameWrapper->GetDataFolder() / "RankGrapher" / "ranktrackerbg.png", true, false);
 	closeImg = std::make_shared<ImageWrapper>(gameWrapper->GetDataFolder() / "RankGrapher" / "closebutton.png", false, true);
@@ -190,7 +193,14 @@ void RankGrapher::RenderCanvas(CanvasWrapper canvas) {
 
 	ifstream inputFile;
 
-	inputFile.open(gameWrapper->GetDataFolder() / "RankGrapher" / (to_string(playlistNum) + "data.csv"));
+	if (isRanked) {
+		fileName = to_string(playlistNum) + "data.csv";
+	}
+	else {
+		fileName = "0data.csv";
+	}
+
+	inputFile.open(gameWrapper->GetDataFolder() / "RankGrapher" / fileName);
 
 	int gameNumber = 0;
 	string gameId;
@@ -202,31 +212,18 @@ void RankGrapher::RenderCanvas(CanvasWrapper canvas) {
 	CVarWrapper timeframeCVar = cvarManager->getCvar("timeframe");
 	if (!timeframeCVar) { return; }
 	string timeframe = timeframeCVar.getStringValue();
-	
-	if (timeframe == "all") {
+
+	if (timeframe == "all" || timeframe == "session") {
+
 		while (getline(inputFile, line)) {
 
 			stringstream inputString(line);
 
 			getline(inputString, tempString, ',');
-			gameNumber = atoi(tempString.c_str());
-
-			getline(inputString, gameId, ',');
-
-			getline(inputString, tempString, ',');
-			mmr = atof(tempString.c_str());
-			allMMR.push_back(mmr);
-
-			line = "";
-		
-		}
-	}
-	if (timeframe == "session") {
-		while (getline(inputFile, line)) {
-
-			stringstream inputString(line);
-
-			getline(inputString, tempString, ',');
+			// skip CSV header
+			if (tempString.compare("game_number") == 0) {
+				continue;
+			}
 			gameNumber = atoi(tempString.c_str());
 
 			getline(inputString, gameId, ',');
@@ -240,10 +237,11 @@ void RankGrapher::RenderCanvas(CanvasWrapper canvas) {
 			//LOG("game session {}", gameSessionId);
 			//LOG("current session {}", currentSession);
 
-			if (gameSessionId == currentSession) {
-				allMMR.push_back(mmr);
+			if (timeframe == "session" && gameSessionId != currentSession) {
+				continue;
 			}
 
+			allMMR.push_back(mmr);
 
 			line = "";
 			//LOG("session {}", mmr);
@@ -480,99 +478,133 @@ void RankGrapher::onGameEntry() {
 				// Getting the mmr
 				userMMR = gameWrapper->GetMMRWrapper().GetPlayerMMR(uniqueID, playlistNum);
 				gotNewMMR = true;
+
+
+				if (!server.IsNull()) {
+
+					PlayerControllerWrapper localPrimaryPlayerController = server.GetLocalPrimaryPlayer();
+					if (!localPrimaryPlayerController.IsNull()) {
+						PriWrapper localPrimaryPlayer = localPrimaryPlayerController.GetPRI();
+
+						if (!localPrimaryPlayer.IsNull()) {
+							goals = localPrimaryPlayer.GetMatchGoals();
+							assists = localPrimaryPlayer.GetMatchAssists();
+							saves = localPrimaryPlayer.GetMatchSaves();
+							demos = localPrimaryPlayer.GetMatchDemolishes();
+							shots = localPrimaryPlayer.GetMatchShots();
+							score = localPrimaryPlayer.GetMatchScore();
+							mvp = localPrimaryPlayer.GetbMatchMVP();
+						}
+
+						TeamWrapper matchWinner = server.GetMatchWinner();
+						if (!matchWinner.IsNull()) {
+							win = (localPrimaryPlayer.GetTeamNum() == matchWinner.GetTeamNum());
+						}
+					}
+				}
 			}
+
 		}
 
-
-		currentMatchGuid = gameWrapper->GetOnlineGame().GetMatchGUID();
-
-
-
-
-
-		fileName = to_string(playlistNum) + "data.csv";
-		fileNameTemp = to_string(playlistNum) + "data_temp.csv";
-
-
-
-
+		if (currentPlaylist.GetbRanked()) {
+			isRanked = true;
+			fileName = to_string(playlistNum) + "data.csv";
+			fileNameTemp = to_string(playlistNum) + "data_temp.csv";
+		}
+		else {
+			isRanked = false;
+			fileName = "0data.csv";
+			fileNameTemp = "0data_temp.csv";
+		}
 
 		ofstream outputFile;
 		ifstream inputFile;
 
 		inputFile.open(gameWrapper->GetDataFolder() / "RankGrapher" / fileName);
+		outputFile.open(gameWrapper->GetDataFolder() / "RankGrapher" / fileNameTemp);
 		string line = "";
 
+		int gameNumber = 0;
+		string gameId;
+		float mmr = 0.0;
+		vector<string> row;
+		string tempString;
 
-		//checking if data file exists, if not then creates file with first row, otherwise add data to file
+
+		//if input file does not exist, create it
+		//if it exists, copy contents and append most recent stats
 
 		if (inputFile.fail()) {
-			outputFile.open(gameWrapper->GetDataFolder() / "RankGrapher" / fileName);
-
-			outputFile << "1" << "," << currentMatchGuid << "," << to_string(userMMR) << "," << currentSession << "\n";
-			outputFile.close();
-			inputFile.close();
-
+			outputFile << "game_number" << ",";
+			outputFile << "match_guid" << ",";
+			outputFile << "mmr" << ",";
+			outputFile << "session_number" << ",";
+			outputFile << "playlist" << ",";
+			outputFile << "timestamp" << ",";
+			outputFile << "goals" << ",";
+			outputFile << "assists" << ",";
+			outputFile << "saves" << ",";
+			outputFile << "demos" << ",";
+			outputFile << "shots" << ",";
+			outputFile << "score" << ",";
+			outputFile << "mvp" << ",";
+			outputFile << "win";
+			outputFile << "\n";
 		}
-
 		else {
 
-
-
-			outputFile.open(gameWrapper->GetDataFolder() / "RankGrapher" / fileNameTemp);
-
-			int gameNumber;
-			gameNumber = 0;
-			string gameId;
-			float mmr;
-			vector<string> row;
-			string tempString;
-			int gameSession;
-
 			while (getline(inputFile, line)) {
-
-
 
 				stringstream inputString(line);
 
 				getline(inputString, tempString, ',');
-				gameNumber = atoi(tempString.c_str());
-				getline(inputString, gameId, ',');
+				// skip CSV header
+				if (tempString.compare("game_number") != 0) {
+					gameNumber = atoi(tempString.c_str());
+					getline(inputString, gameId, ',');
 
-				getline(inputString, tempString, ',');
-				mmr = atof(tempString.c_str());
-
-
-				getline(inputString, tempString, ',');
-				gameSession = atoi(tempString.c_str());
+					getline(inputString, tempString, ',');
+					mmr = atof(tempString.c_str());
+				}
 				
-				outputFile << to_string(gameNumber) << "," << gameId << "," << to_string(mmr) << "," << to_string(gameSession) << "\n";
+				outputFile << line << "\n";
 
 				line = "";
 
-
 			}
-
-			if (userMMR != mmr) {
-				outputFile << to_string(gameNumber + 1) << "," << currentMatchGuid << "," << to_string(userMMR) << "," << to_string(currentSession) << "\n";
-			}
-			
-			outputFile.close();
-			inputFile.close();
-
-
-
-			remove(gameWrapper->GetDataFolder() / "RankGrapher" / fileName.c_str());
-
-
-			// renaming the updated file with the existing file name
-			rename(gameWrapper->GetDataFolder() / "RankGrapher" / fileNameTemp.c_str(), gameWrapper->GetDataFolder() / "RankGrapher" / fileName.c_str());
-
-
-
-
 
 		}
+
+		if (userMMR != mmr) {
+
+			time_t now = time(0);
+			currentMatchGuid = server.GetMatchGUID();
+
+			outputFile << to_string(gameNumber + 1) << ",";
+			outputFile << currentMatchGuid << ",";
+			outputFile << to_string(userMMR) << ",";
+			outputFile << to_string(currentSession) << ",";
+			outputFile << to_string(playlistNum) << ",";
+			outputFile << to_string(now) << ",";
+			outputFile << to_string(goals) << ",";
+			outputFile << to_string(assists) << ",";
+			outputFile << to_string(saves) << ",";
+			outputFile << to_string(demos) << ",";
+			outputFile << to_string(shots) << ",";
+			outputFile << to_string(score) << ",";
+			outputFile << to_string(mvp) << ",";
+			outputFile << to_string(win);
+			outputFile << "\n";
+		}
+
+		outputFile.close();
+		inputFile.close();
+
+
+		remove(gameWrapper->GetDataFolder() / "RankGrapher" / fileName.c_str());
+
+		// renaming the updated file with the existing file name
+		rename(gameWrapper->GetDataFolder() / "RankGrapher" / fileNameTemp.c_str(), gameWrapper->GetDataFolder() / "RankGrapher" / fileName.c_str());
 	} 
 }
 
